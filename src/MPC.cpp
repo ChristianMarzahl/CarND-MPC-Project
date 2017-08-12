@@ -12,7 +12,7 @@ double dt = 0.15;
 
 double ref_cte = 0;
 double ref_epsi = 0;
-double ref_v = 30;
+double ref_v = 20;
 
 size_t x_start = 0;
 size_t y_start = x_start + N;
