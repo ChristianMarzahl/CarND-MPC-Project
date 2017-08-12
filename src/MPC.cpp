@@ -7,12 +7,12 @@
 using CppAD::AD;
 
 // TODO: Set the timestep length and duration
-size_t N = 20;
-double dt = 0.2;
+size_t N = 15;
+double dt = 0.15;
 
 double ref_cte = 0;
 double ref_epsi = 0;
-double ref_v = 15;
+double ref_v = 20;
 
 size_t x_start = 0;
 size_t y_start = x_start + N;
@@ -52,16 +52,16 @@ class FG_eval {
     fg[0] = 0;
 
     // path distance
-    const int cte_mult_factor = 2000;
+    const int cte_mult_factor = 1;//2000;
     // angle distance
-    const int epsi_mult_factor = 2000;
+    const int epsi_mult_factor = 10;//2000;
     // steering multi factor
-    const int steering_mult_factor = 100;
+    const int steering_mult_factor = 10;//100;
     /// velocity multi factor
-    const int velocity_mult_factor = 10;
+    const int velocity_mult_factor = 1;//10;
 
     const int delta_steering_mult_factor = 100;
-    const int delta_velocity_mult_factor = 10;
+    const int delta_velocity_mult_factor = 1; //10;
 
 
     for (uint i = 0; i < N; i++) {
