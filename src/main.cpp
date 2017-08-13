@@ -4,6 +4,7 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <cppad/cppad.hpp>
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "MPC.h"
@@ -12,6 +13,8 @@
 // for convenience
 using json = nlohmann::json;
 
+
+using CppAD::AD;
 
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
@@ -66,6 +69,21 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
   return result;
 }
 
+Eigen::MatrixXd convertMapToCarCoordinateSystem(double x, double y,
+                                       double psi, const vector<double> & ptsx,
+                                       const vector<double> & ptsy) {
+
+  auto waypoints = Eigen::MatrixXd(2,ptsx.size());
+
+  for (uint i=0; i<ptsx.size(); ++i){
+    waypoints(0,i) =   cos(psi) * (ptsx[i] - x) + sin(psi) * (ptsy[i] - y);
+    waypoints(1,i) =  -sin(psi) * (ptsx[i] - x) + cos(psi) * (ptsy[i] - y);
+  }
+
+  return waypoints;
+
+}
+
 int main() {
   uWS::Hub h;
 
@@ -92,35 +110,46 @@ int main() {
           double px = j[1]["x"];
           double py = j[1]["y"];
           double psi = j[1]["psi"];
+          double ms_factor = 0.44704;
           double v = j[1]["speed"];
+          v *= ms_factor;// mph -> m/s
+          double steer_value = j[1]["steering_angle"];
+          double throttle_value = j[1]["throttle"];
+
+
+          Eigen::MatrixXd waypoints = convertMapToCarCoordinateSystem(px,py,psi,ptsx,ptsy);
+          Eigen::VectorXd ptsXVeh = waypoints.row(0);
+          Eigen::VectorXd ptsYVeh = waypoints.row(1);
 
           vector<double> next_x_vals;
           vector<double> next_y_vals;
-
-          // Adding coordinate conversion from map to vehicle space
-          vector<double> ptsXVeh(ptsx.size());
-          vector<double> ptsYVeh(ptsy.size());
-          for (auto i = 0; i < ptsx.size(); ++i) {
-            double orig_x = ptsx[i] - px;
-            double orig_y = ptsy[i] - py;
-            ptsXVeh[i] = orig_x * cos(psi) + orig_y * sin(psi);
-            ptsYVeh[i] = -orig_x * sin(psi) + orig_y * cos(psi);
+          for (uint i = 0; i < ptsx.size(); ++i) {
             next_x_vals.push_back(ptsXVeh[i]);
             next_y_vals.push_back(ptsYVeh[i]);
           }
 
-          // Convert to Eigen vector
           Eigen::Map<Eigen::VectorXd> ptsxE(&ptsXVeh[0], ptsXVeh.size());
           Eigen::Map<Eigen::VectorXd> ptsyE(&ptsYVeh[0], ptsYVeh.size());
 
-          // Fitting 3rd degree polynomial
+          // fit to 3rd degree polynomial
           auto coeffs = polyfit(ptsxE,ptsyE,3);
           double cte = polyeval(coeffs, 0);
           double epsi = atan(coeffs[1]);
 
+
+          double delay_t = .1;
+          //This is the length from front to CoG that has a similar radius.
+          const double Lf = 2.67;
           Eigen::VectorXd state(6);
-          //state << px, py, psi, v, cte, epsi;
-          state << 0.0, 0.0, 0.0, v, cte, epsi;
+          //state << 0.0, 0.0, 0.0, v, cte, epsi;
+
+          state << v * CppAD::cos(steer_value) * delay_t,
+              0,
+              - v * steer_value / Lf * delay_t,
+              v + throttle_value * delay_t,
+              cte + v * sin(epsi) * delay_t,
+              epsi - v * steer_value / Lf * delay_t;
+
 
           /*
           * TODO: Calculate steeering angle and throttle using MPC.
@@ -129,8 +158,8 @@ int main() {
           *
           */
           auto vars = mpc.Solve(state, coeffs);
-          double steer_value = vars[0];
-          double throttle_value = vars[1];
+          steer_value = vars[0];
+          throttle_value = vars[1];
 
           json msgJson;
           msgJson["steering_angle"] = -steer_value; // Invert steering values

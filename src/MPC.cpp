@@ -12,7 +12,8 @@ double dt = 0.05;
 
 double ref_cte = 0;
 double ref_epsi = 0;
-double ref_v = 20;
+double ms_factor = 0.44704;
+double ref_v = 20 * ms_factor;
 
 size_t x_start = 0;
 size_t y_start = x_start + N;
@@ -187,13 +188,6 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   const double v = state[3];
   const double cte = state[4];
   const double epsi = state[5];
-
-  vars[x_start] = x;
-  vars[y_start] = y;
-  vars[psi_start] = psi;
-  vars[v_start] = v;
-  vars[cte_start] = cte;
-  vars[epsi_start] = epsi;
 
   constraints_lowerbound[x_start] = x;
   constraints_lowerbound[y_start] = y;
